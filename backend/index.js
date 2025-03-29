@@ -137,7 +137,7 @@ app.get('/get-user', authenticateToken, async (req, res) => {
 
 // Add Note
 app.post('/add-note', authenticateToken, async (req, res) => {
-  const { title, content, tags } = req.body;
+  const { title, content, tags, departments } = req.body;
   const { user } = req.user;
 
   if (!title) {
@@ -155,6 +155,7 @@ app.post('/add-note', authenticateToken, async (req, res) => {
       title,
       content,
       tags: tags || [],
+      departments: departments || {},
       userId: user._id,
     });
 
@@ -176,7 +177,7 @@ app.post('/add-note', authenticateToken, async (req, res) => {
 // Edit Note
 app.put('/edit-note/:noteId', authenticateToken, async (req, res) => {
   const noteId = req.params.noteId;
-  const { title, content, tags, isPinned } = req.body;
+  const { title, content, tags, isPinned, departments } = req.body;
   const { user } = req.user;
 
   if (!title && !content && !tags) {
@@ -186,7 +187,7 @@ app.put('/edit-note/:noteId', authenticateToken, async (req, res) => {
   }
 
   try {
-    const note = await Note.findOne({ _id: noteId, userId: user._id });
+    const note = await Note.findOne({ _id: noteId });
 
     if (!note) {
       return res.status(400).json({ error: true, message: 'Note not found' });
@@ -195,7 +196,8 @@ app.put('/edit-note/:noteId', authenticateToken, async (req, res) => {
     if (title) note.title = title;
     if (content) note.content = content;
     if (tags) note.tags = tags;
-    if (isPinned) note.isPinned = isPinned;
+    if (isPinned !== undefined) note.isPinned = isPinned;
+    if (departments) note.departments = departments;
 
     await note.save();
 
@@ -217,11 +219,20 @@ app.get('/get-all-notes/', authenticateToken, async (req, res) => {
   const { user } = req.user;
 
   try {
-    const notes = await Note.find({ userId: user._id }).sort({ isPinned: -1 });
+    const notes = await Note.find().select(
+      '_id title content tags departments pinnedBy createdOn'
+    );
+
+    // จัดเรียงโน๊ตที่ผู้ใช้ปักหมุดขึ้นมาก่อน
+    const sortedNotes = notes.sort((a, b) => {
+      const aPinned = a.pinnedBy.includes(user._id);
+      const bPinned = b.pinnedBy.includes(user._id);
+      return bPinned - aPinned; // ถ้า `b` ถูกปักหมุดให้มาก่อน `a`
+    });
 
     return res.json({
       error: false,
-      notes,
+      notes: sortedNotes, // ส่งโน๊ตที่เรียงแล้วกลับไป
       message: 'All notes retrieved successfully',
     });
   } catch (error) {
@@ -261,26 +272,38 @@ app.delete('/delete-note/:noteId', authenticateToken, async (req, res) => {
 // Updete isPinned Value
 app.put('/update-note-pinned/:noteId', authenticateToken, async (req, res) => {
   const noteId = req.params.noteId;
-  const { isPinned } = req.body;
-  const { user } = req.user;
+  const { user } = req.user; // ดึงข้อมูล User ที่ล็อกอินอยู่
 
   try {
-    const note = await Note.findOne({ _id: noteId, userId: user._id });
+    const note = await Note.findOne({ _id: noteId });
 
     if (!note) {
       return res.status(400).json({ error: true, message: 'Note not found' });
     }
 
-    note.isPinned = isPinned;
+    // ป้องกัน `pinnedBy` เป็น `undefined`
+    note.pinnedBy = note.pinnedBy || [];
+
+    // ตรวจสอบว่าผู้ใช้ปักหมุดอยู่หรือไม่
+    const isAlreadyPinned = note.pinnedBy.includes(user._id);
+
+    if (isAlreadyPinned) {
+      note.pinnedBy = note.pinnedBy.filter((id) => id !== user._id); // ถ้าปักหมุดอยู่แล้วให้เลิกปักหมุด
+    } else {
+      note.pinnedBy.push(user._id); // ถ้ายังไม่ได้ปักหมุด ให้เพิ่ม userId เข้าไป
+    }
 
     await note.save();
 
     return res.json({
       error: false,
       note,
-      message: 'Note updated successfully',
+      message: isAlreadyPinned
+        ? 'Unpinned successfully'
+        : 'Pinned successfully',
     });
   } catch (error) {
+    console.error('Error updating pinned status:', error); // log error
     return res.status(500).json({
       error: true,
       message: 'Internal Server Error',
@@ -301,10 +324,12 @@ app.get('/search-notes/', authenticateToken, async (req, res) => {
 
   try {
     const matchingNotes = await Note.find({
-      userId: user._id,
       $or: [
         { title: { $regex: new RegExp(query, 'i') } },
         { content: { $regex: new RegExp(query, 'i') } },
+        { tags: { $regex: new RegExp(query, 'i') } },
+        { 'departments.dept': { $regex: new RegExp(query, 'i') } }, // ค้นหาชื่อแผนก
+        { 'departments.term': { $regex: new RegExp(query, 'i') } }, // ค้นหาคำที่ใช้เรียกแผนก
       ],
     });
 

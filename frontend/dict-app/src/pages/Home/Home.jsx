@@ -8,8 +8,8 @@ import Modal from 'react-modal';
 import axiosInstance from '../../utils/axiosInstance';
 import Toast from '../../components/ToastMessage/Toast';
 import EmptyCard from '../../components/EmptyCard/EmptyCard';
-import AddNotesImg from '../../assets/chat.svg';
-import NoDataImg from '../../assets/options.svg';
+import AddNotesImg from '../../assets/AddNotes.svg';
+import NoDataImg from '../../assets/NoDtata.svg';
 
 const Home = () => {
   const [openAddEditModal, setOpenAddEditModal] = useState({
@@ -26,7 +26,6 @@ const Home = () => {
 
   const [allNotes, setAllNotes] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
-
   const [isSearch, setIsSearch] = useState(false);
 
   const navigate = useNavigate();
@@ -69,7 +68,6 @@ const Home = () => {
   const getAllNotes = async () => {
     try {
       const response = await axiosInstance.get('/get-all-notes');
-
       if (response.data && response.data.notes) {
         setAllNotes(response.data.notes);
       }
@@ -118,17 +116,14 @@ const Home = () => {
     const noteId = noteData._id;
     try {
       const response = await axiosInstance.put(
-        '/update-note-pinned/' + noteId,
-        {
-          isPinned: !noteData.isPinned,
-        }
+        '/update-note-pinned/' + noteData._id
       );
       if (response.data && response.data.note) {
-        showToastMessage('Updated Successfully');
+        console.log('Updated Note:', response.data.note); // ✅ ตรวจสอบ `pinnedBy`
         getAllNotes();
       }
     } catch (error) {
-      console.log(error);
+      console.error('Failed to update pinned note:', error);
     }
   };
 
@@ -158,10 +153,14 @@ const Home = () => {
               <NoteCard
                 key={item._id}
                 title={item.title}
-                date={item.createdOn}
+                // date={item.createdOn}
                 content={item.content}
-                tags={item.tags}
-                isPinned={item.isPinned}
+                tags={
+                  Array.isArray(item.departments) && item.departments.length > 0
+                    ? item.departments
+                    : []
+                }
+                isPinned={item.pinnedBy?.includes(userInfo?._id) || false}
                 onEdit={() => handleEdit(item)}
                 onDelete={() => deleteNote(item)}
                 onPinNote={() => updateIsPinned(item)}
@@ -174,8 +173,7 @@ const Home = () => {
             message={
               isSearch
                 ? `Oops! No matching your search.`
-                : `Start creating your first technical terms! Click the 'Add' button to jot down your
-            thoughts, ideas, and reminders. Let's get started!`
+                : `Start building your technical terms! Click the 'Add' button to save your terms, definitions, and key concepts. Let's get started!`
             }
           />
         )}
@@ -183,6 +181,7 @@ const Home = () => {
 
       <button
         className="w-16 h-16 flex items-center justify-center rounded-2xl bg-primary hover:bg-red-600 absolute right-10 bottom-10"
+        disabled={!userInfo} // ✅ ป้องกันกดก่อน userInfo มา
         onClick={() => {
           setOpenAddEditModal({ isShown: true, type: 'add', data: null });
         }}
@@ -209,6 +208,7 @@ const Home = () => {
           }}
           getAllNotes={getAllNotes}
           showToastMessage={showToastMessage}
+          currentUserId={userInfo?._id}
         />
       </Modal>
 
