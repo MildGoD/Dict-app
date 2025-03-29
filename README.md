@@ -1,6 +1,6 @@
 # Dict App – Note-Taking for Technical Terms
 
-A web application for creating and organizing technical notes with support for tags and department-based classification. Built with React (frontend) and Node.js + MongoDB (backend).
+A web application for creating and organizing technical notes with support for tags and department-based classification. Build a Full Stack using MERN | MongoDB, Express, React JS, Node JS
 
 ## 📂 Project Structure
 
