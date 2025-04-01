@@ -180,8 +180,8 @@ const Home = () => {
       </div>
 
       <button
-        className="w-16 h-16 flex items-center justify-center rounded-2xl bg-primary hover:bg-red-600 absolute right-10 bottom-10"
-        disabled={!userInfo} // ✅ ป้องกันกดก่อน userInfo มา
+        className="w-16 h-16 flex items-center justify-center rounded-2xl bg-primary hover:bg-red-600 fixed right-10 bottom-10"
+        disabled={!userInfo}
         onClick={() => {
           setOpenAddEditModal({ isShown: true, type: 'add', data: null });
         }}
